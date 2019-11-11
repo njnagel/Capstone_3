@@ -10,8 +10,6 @@ from seaborn import heatmap
 import geopandas as gpd
 import datetime 
 import descartes
-
-#import geoplot
 from shapely.geometry import Point, Polygon
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from numpy.linalg import svd
@@ -23,36 +21,30 @@ from sklearn.ensemble.partial_dependence import plot_partial_dependence
 from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import GradientBoostingRegressor
-
-#----Tree visualization--------------------------------
-from sklearn.tree import export_graphviz
-from IPython.display import Image
 from sklearn.metrics import r2_score
 
+
+#################wider output
 pd.options.display.max_colwidth = 100
+
+####################read data, select rows, saved to csv.
 
 #fullcrimes = pd.read_csv("../Capstone_2/data/Crimes_-_2001_to_present.csv")
 #chicagocrimes2018 = fullcrimes.where(fullcrimes['Year'] >= 2018)
-#chicagocrimes2018 = chicagocrimes2018.to_csv('data/crimes2018.csv')
 
-# chicagocrimes = pd.read_csv('data/crimes2018.csv')
 # crimes = chicagocrimes.where(chicagocrimes['Year'] == 2018) 
 crimes = pd.read_csv('data/2018crimes.csv')
 # crimes = readfile.where(readfile['Year'] == 2018, inplace=True)
-#wardnums = pd.read_csv('data/WardpopsPerc.csv', header=0)
 commareanums = pd.read_csv('data/CensusCA.csv', header = 0)
 aerosol=pd.read_excel('../../../Downloads/Aerosol_Optical_Depth_v2.xlsx')
 coarsepart=pd.read_excel('../../../Downloads/Coarse_Particle_Pollution__Inverse_Distance_Weighting.xlsx')
 finepart=pd.read_excel('../../../Downloads/Fine_Particle_Pollution__Inverse_Distance_Weighting_v2.xlsx')
 nitdioxide=pd.read_excel('../../../Downloads/Nitrogen_Dioxide_Annual_Air_Concentration_v2.xlsx')
 ozone=pd.read_excel('../../../Downloads/Ozone_Annual_Concentration__Inverse_Distance_Weighting_v2.xlsx')
-# annualepaconcs = pd.read_csv('data/annual_conc_by_monitor_2018.csv')
-# illconc = annualepaconcs[annualepaconcs['State Name'] == 'Illinois'] 
-# chiccoc = illconc[illconc['City Name']=='Chicago']
-# illconcozone = illconc[illconc['Parameter Name']=='Ozone']
-# chicozone = chiccoc[chiccoc['Parameter Name']=='Ozone']
+
 crimesdom=crimes[crimes['Domestic'] == True]
 
+##########calculate columns for EDA, analysis
 arrestsbyca = crimes.groupby('Community Area')['Arrest'].sum()
 arrestsdom=crimesdom.groupby('Community Area')['Arrest'].sum()
 
@@ -77,6 +69,7 @@ commareanums['domrate'] = commareanums['domrate'].astype('float')
 commareaanal = commareanums.drop(['COMMUNITY AREA NAME', 'POPULATION','arrestsbyca','dombyca','arrestsdom','domarrestrate'], axis = 1) 
 commareaanal=commareaanal.dropna()
 
+commareaanal = commareaanal[commareaanal['domrate'] < 600]
 X = commareaanal.drop(['Community Area Number', 'arrestrate','domrate'], axis =1)
 y = commareaanal['domrate']
 
@@ -85,12 +78,12 @@ num_estimator_list = [1,2,5,10,20,40,100,500,1000]
 
 
 
-#########plotting error values on map
+#########preparing data for map
 street_map = gpd.read_file('data/geo_export_e603e826-68c1-4029-95cf-2feaa0cc9da2.shp')
 street_map["area_numbe"] = street_map["area_numbe"].astype(int)
 
 merged = street_map.set_index('area_numbe').join(commareanums.set_index('Community Area Number'))
-
+###########functions for mapping
 def plot_map(measure):
     plotvar = merged[measure]
     vmin=plotvar.min()
@@ -104,6 +97,12 @@ def plot_map(measure):
     # add the colorbar to the figure
     cbar = fig.colorbar(sm)
 
+def scatter_plots(xmeasure, ymeasure):
+    plt.scatter(commareaanal[xmeasure],commareaanal[ymeasure])
+    #plt.title(xmeasure, 'v.', ymeasure)
+    corrxy = np.corrcoef(commareaanal[xmeasure], commareaanal[ymeasure]) 
+    print(corrxy)   
+
 
 if __name__ == '__main__':
     ######EDA
@@ -113,7 +112,9 @@ if __name__ == '__main__':
     # plt.yticks(rotation=90, fontsize=5)
 
     # cacorr=commareaanal.corr()
-    # sns.heatmap(cacorr)
+    # sns.heatmap(cacorr, cmap='cubehelix', annot=True)
+    # plt.yticks(fontsize=8)
+    # plt.xticks(rotation=45, fontsize=8)
     #############plots
     # commareanums=commareanums.sort_values('domrate')
     # plt.barh(commareanums['COMMUNITY AREA NAME'], commareanums['domrate'])
@@ -130,10 +131,7 @@ if __name__ == '__main__':
     # plt.yticks(fontsize = 5)
     # plt.title('Arrest Rate for Domestic Calls by Community Area')
 
-    # plt.scatter(commareanums['arrestrate'],commareanums['domrate'])
-    # plt.title('Arrest Population Rate v. Domestic Call Poopulation Rate')
 
-    np.corrcoef(commareanums['arrestrate'], commareanums['domrate'])
 
     # f = plt.figure(figsize=(19, 15))
     # plt.matshow(commareaanal.corr(), fignum=f.number)
@@ -143,7 +141,7 @@ if __name__ == '__main__':
     # cb.ax.tick_params(labelsize=10)
     ########mapping epa monitors in chicago
 
-    street_map = gpd.read_file('data/geo_export_e603e826-68c1-4029-95cf-2feaa0cc9da2.shp')
+    # street_map = gpd.read_file('data/geo_export_e603e826-68c1-4029-95cf-2feaa0cc9da2.shp')
 # site_points = chicozone[['Longitude', 'Latitude']].apply(lambda row:
 #               Point(row["Longitude"], row["Latitude"]), axis=1)
 # geo_sites = gpd.GeoDataFrame({"geometry": site_points,
@@ -193,43 +191,42 @@ if __name__ == '__main__':
 
     ##########Getting each CA MSE
    
-    # train_errors_rf = []
-    # test_errors_rf = []
+    train_errors_rf = []
+    test_errors_rf = []
     
-    rf = RandomForestRegressor(n_estimators = 20, n_jobs=-1)
+    rf = RandomForestRegressor(n_estimators = 100, n_jobs=-1)
     rf.fit(X, y)
     y_pred =  rf.predict(X)
     commareanums['diff2'] = (y - y_pred)**2
     commareanums['diffbyca'] = commareanums.groupby('Community Area Number')['diff2'].mean()
 
-    # plt.barh(commareanums['COMMUNITY AREA NAME'],diffbyca)
-    # plt.yticks(fontsize=5)
+    plt.barh(commareanums['COMMUNITY AREA NAME'],commareanums['diffbyca'])
+    plt.yticks(fontsize=5)
      
 
 #########plotting error values on map
-    street_map = gpd.read_file('data/geo_export_e603e826-68c1-4029-95cf-2feaa0cc9da2.shp')
-    street_map["area_numbe"] = street_map["area_numbe"].astype(int)
-    #cpd.merge(counties, us_data, on="FIPS")
-    merged = street_map.set_index('area_numbe').join(commareanums.set_index('Community Area Number'))
-    meandiff=merged['diffbyca'].mean()
-    stddiff=merged['diffbyca'].std()
-    merged['diffstdzd']=(merged['diffbyca'] - meandiff)/stddiff
-    # q = merged['diffbyca'].quantile(0.75)
-    # merged[merged["diffbyca"] < q]
+    # street_map = gpd.read_file('data/geo_export_e603e826-68c1-4029-95cf-2feaa0cc9da2.shp')
+    # street_map["area_numbe"] = street_map["area_numbe"].astype(int)
+    # #cpd.merge(counties, us_data, on="FIPS")
+    # merged = street_map.set_index('area_numbe').join(commareanums.set_index('Community Area Number'))
+    # meandiff=merged['diffbyca'].mean()
+    # stddiff=merged['diffbyca'].std()
+    # merged['diffstdzd']=(merged['diffbyca'] - meandiff)/stddiff
+    # q = merged['diffbyca'].quantile(0.95)
+    # merged = merged[merged["diffbyca"] < q]
+    # plotvar = merged['diffbyca']
+    # #vmin, vmax = 0, 100
+    # vmin=plotvar.min()
+    # vmax=plotvar.max()
+    # fig, ax = plt.subplots(1, figsize=(10, 6))
+    # merged.plot(column=plotvar, linewidth=0.8, ax=ax, cmap='PiYG')
     
-    plotvar = merged['diffbyca']
-    #vmin, vmax = 0, 100
-    vmin=plotvar.min()
-    vmax=plotvar.max()
-    fig, ax = plt.subplots(1, figsize=(10, 6))
-    merged.plot(column=plotvar, linewidth=0.8, ax=ax, cmap='PRGn')
-    #plt.clim(plotvar.min(), plotvar.max())
-    # Create colorbar as a legend
-    sm = plt.cm.ScalarMappable(norm=plt.Normalize(vmin=vmin, vmax=vmax), cmap='PRGn')
-    # empty array for the data range
-    sm._A = []
-    # add the colorbar to the figure
-    cbar = fig.colorbar(sm)
+    # # Create colorbar as a legend
+    # sm = plt.cm.ScalarMappable(norm=plt.Normalize(vmin=vmin, vmax=vmax), cmap='PiYG')
+    # # empty array for the data range
+    # sm._A = []
+    # # add the colorbar to the figure
+    # cbar = fig.colorbar(sm)
     
     
 
@@ -277,7 +274,7 @@ if __name__ == '__main__':
 
     
     
-    # fig, axs = plot_partial_dependence(gb, X_train, [2],
+    # fig, axs = plot_partial_dependence(gb, X_train, [12],
     #                                    feature_names = commareaanal.columns.values[1:14],
     #                                    n_jobs=-1, grid_resolution=50)
     # fig.subplots_adjust(hspace = .2)
